@@ -1,15 +1,22 @@
-class ResourceConfiguration
-  belongs_to_hierarchy :resource, members: [:service, :media_file, :batch, :project, :account]
-end
-
 class Service
-  in_hierarchy [:service, :media_file, :batch, :project, :accuont] do
+  through_hierarchy [:service, :media_file, :batch, :project, :accuont] do
     has_many :resource_configurations, uniq: :resource_configuration_type_id
   end
 end
 
 class Project
-  in_hierarchy [:project, :account] do
+  through_hierarchy [:project, :account] do
     has_many :resource_configurations, uniq: :resource_configuration_type_id
   end
 end
+
+class MediaFile
+  through_hierarchy [:batch, :project, :account] do
+    has_many :special_instructions
+  end
+
+  through_hierarchy [:services] do
+    has_many :processing_errors
+  end
+end
+
