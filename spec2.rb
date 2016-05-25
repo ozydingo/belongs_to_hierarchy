@@ -1,5 +1,5 @@
 class Service
-  through_hierarchy [:service, :media_file, :batch, :project, :accuont] do
+  through_hierarchy [:media_file, :batch, :project, :account] do
     has_many :resource_configurations, uniq: :resource_configuration_type_id
   end
 end

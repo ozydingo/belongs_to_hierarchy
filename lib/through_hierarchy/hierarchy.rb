@@ -7,12 +7,14 @@ module ThroughHierarchy
       validate_members
     end
 
-    def has_one(name, **options)
-      @klass.hierarchical_associations[name] = ::ThroughHierarchy::Associations::HasOne.new(name, @members, **options)
+    def has_one(name, scope = nil, **options)
+      options.merge!(scope: scope) if scope.present?
+      @klass.hierarchical_associations[name] = ::ThroughHierarchy::Associations::HasOne.new(name, @klass, @members, scope, options)
     end
 
-    def has_many(name, **options)
-      @klass.hierarchical_associations[name] = ::ThroughHierarchy::Associations::HasMany.new(name, @members, **options)
+    def has_many(name, scope = nil, **options)
+      options.merge!(scope: scope) if scope.present?
+      @klass.hierarchical_associations[name] = ::ThroughHierarchy::Associations::HasMany.new(name, @klass, @members, scope, options)
     end
 
     private

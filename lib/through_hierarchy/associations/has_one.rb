@@ -1,6 +1,9 @@
 module ThroughHierarchy
   module Associations
-    class HasMany
+    class HasOne
+      def find
+        super.first
+      end
     end
   end
 end
