@@ -1,7 +1,7 @@
 module ThroughHierarchy
   module Associations
-    class HasOne
-      def find
+    class HasOne < Association
+      def find(instance)
         super.first
       end
     end

@@ -15,7 +15,7 @@ module ThroughHierarchy
 
     module ClassMethods
       def through_hierarchy(members, &blk)
-        ::ThroughHierarchy::Hierarchy.new(self, members).instance_eval(&blk)
+        Hierarchy.new(self, members).instance_eval(&blk)
       end
     end
   end

@@ -1,5 +1,7 @@
-class ThroughHierarchyError < StandardError
-end
+module ThroughHierarchy
+  class ThroughHierarchyError < StandardError
+  end
 
-class ThroughHierarchyDefinitionError < ThroughHierarchyError
+  class ThroughHierarchyDefinitionError < ThroughHierarchyError
+  end
 end

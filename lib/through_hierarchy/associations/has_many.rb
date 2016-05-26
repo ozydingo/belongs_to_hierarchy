@@ -1,6 +1,6 @@
 module ThroughHierarchy
   module Associations
-    class HasMany
+    class HasMany < Association
     end
   end
 end
