@@ -14,19 +14,28 @@ module ThroughHierarchy
       end
 
       def find(instance)
+        return uniq_find(instance) if @uniq.present?
+
         results = foreign_class.where(arel_instance_filters(instance))
         results = results.instance_exec(&@scope) if @scope.present?
         return results
       end
 
       def joins
-        join_sources = @model.arel_table.join(foreign_arel_table).on(arel_model_filters).join_sources
-        results = @model.joins(join_sources)
-        results = results.merge(foreign_class.instance_exec(&@scope)) if @scope.present?
-        return results
+        # TODO: make this work
+        # joins = @model.arel_table.join(foreign_arel_table).on(arel_model_filters)
+
+        # joins = joins.join(arel_uniq_subquery).on(
+        #   arel_hierarchy_rank.eq(uniq_subquery_arel_table[best_hierarchy_match_name]).
+        #   and(foreign_arel_table[@uniq].eq(uniq_subquery_arel_table[@uniq]))
+        # ) if @uniq.present?
+
+        # results = @model.joins(joins.join_sources)
+        # results = results.merge(foreign_class.instance_exec(&@scope)) if @scope.present?
+        # return results
       end
 
-      def create
+      def create(member, attributes)
         # NIY
       end
 
@@ -47,10 +56,59 @@ module ThroughHierarchy
         foreign_class.arel_table
       end
 
-      def sort_order
+      def sql_hierarchy_rank
         "CASE `#{foreign_class.table_name}`.`#{foreign_type_field}` " +
           hierarchy_models.map.with_index{|m, ii| "WHEN #{@model.sanitize(model_type_constraint(m))} THEN #{ii} "}.join +
           "END"
+      end
+
+      def arel_hierarchy_rank
+        Arel.sql(sql_hierarchy_rank)
+      end
+
+      # TODO: generate this dynamically based on existing columns and selects
+      def best_hierarchy_match_name
+        "through_hierarchy_match"
+      end
+
+      def arel_best_hierarchy_member
+        arel_hierarchy_rank.minimum.as(best_hierarchy_match_name)
+      end
+
+      # TODO: for model level joins, subquery needs to join to all hierarchy tables
+      def arel_uniq_subquery(instance = nil)
+        foreign_arel_table.
+          project(foreign_arel_table[Arel.star], arel_best_hierarchy_member).
+          where(instance.present? ? arel_instance_filters(instance) : arel_model_filters).
+          group(foreign_arel_table[@uniq]).
+          as(uniq_subquery_alias)
+      end
+
+      def uniq_subquery_alias
+        "through_hierarchy_subtable"
+      end
+
+      def uniq_subquery_arel_table
+        Arel::Table.new(uniq_subquery_alias)
+      end
+
+      # TODO: build join sources for model-level query
+      def uniq_subquery_join_sources(instance = nil)
+        foreign_arel_table.
+          join(arel_uniq_subquery(instance)).
+          on(
+            arel_hierarchy_rank.eq(uniq_subquery_arel_table[best_hierarchy_match_name]).
+            and(foreign_arel_table[@uniq].eq(uniq_subquery_arel_table[@uniq]))
+          ).join_sources
+      end
+
+      def uniq_find(instance)
+        join_sources = uniq_subquery_join_sources(instance)
+
+        return foreign_class.
+          joins(uniq_subquery_join_sources(instance)).
+          where(arel_instance_filters(instance)).
+          order(foreign_arel_table[@uniq])
       end
 
       def hierarchy_models
