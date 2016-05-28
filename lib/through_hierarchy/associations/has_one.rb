@@ -2,7 +2,8 @@ module ThroughHierarchy
   module Associations
     class HasOne < Association
       def find(instance)
-        super.first
+        q = super
+        q.reorder(sql_hierarchy_rank).order(q.order_values).first
       end
     end
   end

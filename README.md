@@ -1,5 +1,5 @@
 # Has Many Through Hierarchy
-### Define hierarchically polymorphic has_one and has_many assocaitions between ActiveRecord models
+## Define hierarchically polymorphic has_one and has_many assocaitions between ActiveRecord models
 
 Through Hierarchy allows you to construct associations that span across associaiton hierarchies. For example, consider the models `Document`, `Folder`, and `Project`. These models might be organized into a hierarchy where `Project` `has_many :folders`, `Folder` `has_many :documents`, and `Project` `has_many :documents, through: folders`.
 
@@ -23,6 +23,8 @@ class Document < ActiveRecord::Base
 end
 ```
 
+### Hierarchy order
+
 You could also choose to define the resource hierarchy in the other order. In this mode, rather than `Project.tags` returning all the tags belonging to it or its sub-hierarchy, we want `Document.tags` to return the tags of itself and its hierarchy superiors.
 
 ```ruby
@@ -43,16 +45,81 @@ class Document < ActiveRecord::Base
 end
 ```
 
-A common use case for this are configurations that may be applied at the `Project`, `Folder`, or `Document` level, where applying a configuration at a lower level shadows a higher-level configuration. Consider a `ResourceConfiguration` model that has `resource_configuration_type` and `value` columns. As a simple example, let's say we have a `resource_configuration_type` of `"date_format"`, where the values are either `"mm/dd/yyyy`" or `"dd/mm/yyyy"`. The idea is that you might apply a `"mm/dd/yyyy"` configuration to a `Project`, but maybe one of its `Folders` overrides that to `"dd/mm/yyyy"`. Any `Document` or `Folder` that didn't have its own date_format configuration would fall back to its parent's configuration.
+### Fetching by closest hierarchy member (shadowing)
 
-Using ThroughHierarchy, you can set this up using the `uniq` options:
+A common use case for this are configurations that may be applied at the `Project`, `Folder`, or `Document` level, where applying a configuration at a lower level shadows a higher-level configuration.
+
+To illustrate this, consider first a very simplified and totally-not-overkill-at-all `ShareSetting` model that `belongs_to :shareable, polymorphic: true` and has a boolean `shared` column. The idea would be to create a `ShareSetting` record for a `Project`, say we set it to `true`, and it would be inherited implicity by all of its `Folder`s and `Document`s. However, you could override this at a lower resource level by, for example, creating another `ShareSetting` record for one of this Project's folders. The desired behavior would look like this:
 
 ```ruby
 class Document < ActiveRecord::Base
   through_hierarchy [:folder, :project] do
-    has_many :tags, as: :resource, uniq: :resource_configuration_type
+    has_one :share_settting, as: :resource
   end
 end
+
+project = Project.first
+ShareSetting.create(shareable: project, shared: true)
+doc = project.documents.first
+doc.share_setting
+# => #<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>
+# Override the project config for a single folder:
+ShareSetting.create(shareable: doc.folder, shared: false)
+# Be sure to reload the asoociation by passing true!
+doc.share_setting(true)
+# => #<ShareSetting id: 2, shareable_type: "Folder", shareable_id: 1, shared: false>
 ```
 
-Now, `document.resource_configurations` only returns one `ResourceConfiguration` per `resource_configuration_type`: that which belongs to the lowest element of the hierarchy. Thus the returned records may be at any resource level (`Documnet`, `Folder`, or `Project`) depending on the data, but each is guaranteed to be the configuration that applies to `document`.
+### Fetching many by closest hierarchy member
+
+In the context of a plain `has_many` association, this shadowing behavior doesn't make sense as you would expect it to return *all* `ShareSetting` belonging to the hierarchy:
+
+```ruby
+class Document < ActiveRecord::Base
+  through_hierarchy [:folder, :project] do
+    has_many :share_setttings, as: :resource
+  end
+end
+
+Document.first.share_settings
+# => #<ActiveRecord::Relation [#<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>, #<ShareSetting id: 2, shareable_type: "Folder", shareable_id: 1, shared: false>]>
+```
+
+But for a more complicated `ShareSetting` model, this gets more interesting, and so we have the `uniq` feature. Let's add a `group` column to ShareSetting so we can indepednently turn on or off sharing for different groups, again at any resource level:
+
+```ruby
+project = Project.first
+project.share_settings.destroy_all
+project.share_settings.create(group: "dev", shared: true)
+project.share_settings.create(group: "ops", shared: false)
+doc = project.documents.first
+doc.share_settings.where(group: "dev").first
+# => #<ShareSetting id: 3, shareable_type: "Project", shareable_id: 1, group: "dev", shared: true>
+```
+
+But because this is still a plain `has_many`, we lose the shadowing:
+
+```ruby
+doc.share_settings.create(group: "ops", shared: true)
+doc.share_settings.where(group: "ops")
+# => #<ActiveRecord::Relation [#<ShareSetting id: 4, shareable_type: "Project", shareable_id: 1, group: "ops", shared: false>, #<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: false>]>
+```
+
+In order to retrive only one `ShareSetting` per group, you simply need to specify it thusly:
+
+```ruby
+class Document < ActiveRecord::Base
+  through_hierarchy [:folder, :project] do
+    has_many :share_setttings, as: :resource, uniq: :group
+  end
+end
+
+Document.first.share_settings.where(group: "ops")
+# => #<ActiveRecord::Relation [#<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: true>]>
+
+Document.first.share_settings
+# => #<ActiveRecord::Relation [#<ShareSetting id: 3, shareable_type: "Project", shareable_id: 1, group: "dev", shared: true>, #<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: true>]>
+
+```
+
+Notice that we correclty select only the `ShareSetting` for each group that belongs to the lower level resource in the hierarchy: the project is not shared with "ops", but this specific document has a `ShareSetting` that overrides that.
