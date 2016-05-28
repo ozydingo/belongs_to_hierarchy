@@ -4,6 +4,7 @@ require 'through_hierarchy/builder.rb'
 require 'through_hierarchy/associations/association.rb'
 require 'through_hierarchy/associations/has_one.rb'
 require 'through_hierarchy/associations/has_many.rb'
+require 'through_hierarchy/associations/has_uniq.rb'
 require 'through_hierarchy/exceptions.rb'
 
 ActiveRecord::Base.include(ThroughHierarchy::Base)
