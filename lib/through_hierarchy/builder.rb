@@ -18,11 +18,6 @@ module ThroughHierarchy
           return @hierarchical_association_cache[name] if !reload && @hierarchical_association_cache.key?(name)
           @hierarchical_association_cache[name] = self.hierarchical_associations[name].find(self)
         end
-
-        # TODO: join_through_hierarchy
-
-        # TODO: create_from_hierarchy(member, attributes)
-        
       end
     end
   end

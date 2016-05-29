@@ -4,4 +4,7 @@ module ThroughHierarchy
 
   class ThroughHierarchyDefinitionError < ThroughHierarchyError
   end
+
+  class ThroughHierarchyAssociationMissingError < ThroughHierarchyError
+  end
 end

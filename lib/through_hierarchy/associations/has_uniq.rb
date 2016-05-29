@@ -1,7 +1,8 @@
 module ThroughHierarchy
   module Associations
     class HasUniq < Association
-      def joins
+      def join
+        raise "Unfortunately, joining to a has_uniq association is not yet supported"
         # TODO: make this work
         # joins = @model.arel_table.join(foreign_arel_table).on(arel_model_filters)
 

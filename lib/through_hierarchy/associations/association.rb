@@ -16,12 +16,10 @@ module ThroughHierarchy
         return results
       end
 
-      def joins
-        # TODO: make this work
-        # joins = @model.arel_table.join(foreign_arel_table).on(arel_model_filters)
-        # results = @model.joins(joins.join_sources)
-        # results = results.merge(foreign_class.instance_exec(&@scope)) if @scope.present?
-        # return results
+      def join
+        results = @model.joins(*@members, get_join_sources)
+        results = results.merge(foreign_class.instance_exec(&@scope)) if @scope.present?
+        return results
       end
 
       def create(member, attributes)
@@ -45,6 +43,10 @@ module ThroughHierarchy
 
       def get_matches(instance)
         foreign_class.where(arel_instance_filters(instance))
+      end
+
+      def get_join_sources
+        @model.arel_table.join(foreign_arel_table).on(arel_model_filters).join_sources
       end
 
       def foreign_class
