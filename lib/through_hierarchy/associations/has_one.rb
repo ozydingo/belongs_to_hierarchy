@@ -2,11 +2,14 @@ module ThroughHierarchy
   module Associations
     class HasOne < Association
       def find(instance)
-        results = foreign_class.
-          where(arel_instance_filters(instance)).
-          order(sql_hierarchy_rank)
-        results = results.instance_exec(&@scope) if @scope.present?
-        return results.first
+        super.first
+      end
+
+      private
+
+      # We always prefer better hierarchy matches regardless of scope ordering
+      def get_matches(instance)
+        super.order(arel_hierarchy_rank)
       end
     end
   end

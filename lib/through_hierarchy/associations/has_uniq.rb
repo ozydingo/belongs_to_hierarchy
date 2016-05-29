@@ -1,15 +1,6 @@
 module ThroughHierarchy
   module Associations
     class HasUniq < Association
-      def find(instance)
-        results = foreign_class.
-          joins(subquery_join_sources(instance)).
-          where(arel_instance_filters(instance)).
-          order(foreign_arel_table[@uniq])
-        results = results.instance_exec(&@scope) if @scope.present?
-        return results
-      end
-
       def joins
         # TODO: make this work
         # joins = @model.arel_table.join(foreign_arel_table).on(arel_model_filters)
@@ -34,6 +25,12 @@ module ThroughHierarchy
       def validate_options
         super
         @uniq # TODO
+      end
+
+      # Use subquery method to select best hierarchy match for each @uniq
+      # Order by @uniq can result in better performance than default order (id)
+      def get_matches(instance)
+        super.joins(subquery_join_sources(instance)).order(foreign_arel_table[@uniq])
       end
 
       def subquery_alias

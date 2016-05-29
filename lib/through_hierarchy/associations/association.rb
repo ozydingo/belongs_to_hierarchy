@@ -11,7 +11,7 @@ module ThroughHierarchy
       end
 
       def find(instance)
-        results = foreign_class.where(arel_instance_filters(instance))
+        results = get_matches(instance)
         results = results.instance_exec(&@scope) if @scope.present?
         return results
       end
@@ -41,6 +41,10 @@ module ThroughHierarchy
         @model.is_a?(Class) or raise ThroughHierarchyDefinitionError, "Expected: class, got: #{@model.class}"
         @model < ActiveRecord::Base or raise ThroughHierarchyDefinitionError, "Expected: ActiveRecord::Base descendant, got: #{@model}"
         @scope.blank? || @scope.is_a?(Proc) or raise ThroughHierarchyDefinitionError, "Expected scope to be a Proc, got #{@scope.class}"
+      end
+
+      def get_matches(instance)
+        foreign_class.where(arel_instance_filters(instance))
       end
 
       def foreign_class
