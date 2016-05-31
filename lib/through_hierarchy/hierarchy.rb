@@ -27,7 +27,7 @@ module ThroughHierarchy
 
     def validate_hierarchy
       @members.is_a?(::Array) or ::Kernel.raise ::ThroughHierarchy::ThroughHierarchyDefinitionError, "Hierarchy members: expected: Array, got: #{@members.class}"
-      @members.all?{|member| @klass.reflect_on_association(member).present?} or ::Kernel.raise ::ThroughHierarchy::ThroughHierarchyDefinitionError, "No association named #{member} was found. Perhaps you misspelled it?"
+      @members.all?{|member| @klass.reflect_on_association(member).present? or ::Kernel.raise ::ThroughHierarchy::ThroughHierarchyDefinitionError, "No association named #{member} was found. Perhaps you misspelled it?"}
     end
   end  
 end

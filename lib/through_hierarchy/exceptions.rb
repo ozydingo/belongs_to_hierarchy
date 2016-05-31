@@ -7,4 +7,10 @@ module ThroughHierarchy
 
   class ThroughHierarchyAssociationMissingError < ThroughHierarchyError
   end
+
+  class ThroughHierarchySourceError < ThroughHierarchyError
+  end
+
+  class ThroughHierarchyInstanceError < ThroughHierarchyError
+  end
 end
