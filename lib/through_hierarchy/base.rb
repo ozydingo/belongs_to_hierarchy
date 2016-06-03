@@ -17,6 +17,13 @@ module ThroughHierarchy
       def through_hierarchy(members, &blk)
         Hierarchy.new(self, members).instance_eval(&blk)
       end
+
+      def joins_through_hierarchy(name)
+        hierarchical_associations.key?(name) or raise ThroughHierarchyAssociationMissingError, "No association named #{name} was found. Perhaps you misspelled it?"
+        hierarchical_associations[name].join
+      end
+
+      # TODO: create_through_hierarchy(member = self, attributes)
     end
   end
 end
