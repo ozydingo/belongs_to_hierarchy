@@ -1,9 +1,21 @@
 # Has Many Through Hierarchy
 ## Define hierarchically polymorphic has_one and has_many assocaitions between ActiveRecord models
 
-Through Hierarchy allows you to construct associations that span across associaiton hierarchies. For example, consider the models `Document`, `Folder`, and `Project`. These models might be organized into a hierarchy where `Project` `has_many :folders`, `Folder` `has_many :documents`, and `Project` `has_many :documents, through: folders`.
+Through Hierarchy allows you to construct associations that span across associaiton hierarchies. These fall into three type: `HasMany`, `HasOne`, and `HasMany :uniq`.
 
-Now consider a polymorphically assocaited `Tag` model. A given `Tag` can belong to any member of this hierarchy. So how do you get all the tags under a `Project`? Through Hierarchy allows you to very simply, and dynamically, define this association that run reasonably efficiently and return an `ActiveRecord::Relation` so that you can chain other scopes and queries to the result, taking advantage of lazy loading and everything else ActiveRecord has to offer.
+* A `HasMany` assocaition fetches any objects associated to a target through any of its hierarchy members.
+
+* A `HasOne` will always fetch the association belonging to the closest hierarchy member (e.g. Document < Folder < Project).
+
+* A `HasMany :uniq` assocaition retrieves multiple assocaited objects, but groups them by a specified field (e.g. a type or type_id column), and fetches only the object belonging to the closest hierarchy member *within* each group. In essense, a `HasMany :uniq` association can be described as a `HasMany HasOnes` of the same model.
+
+### Example
+
+For example, consider the models `Document`, `Folder`, and `Project`. These models might be organized into a hierarchy where `Project` `has_many :folders`, `Folder` `has_many :documents`, and `Project` `has_many :documents, through: folders`.
+
+Now let's make a `Tag` model that can (polymorphically) belong to any of these three models. Through Hierarchy allows you to very simply fetch all tags across the hierarchy as an ActiveRecord Relation. Thus you can chain the result, and get all the benefits of ActiveRecord, including lazy loading.
+
+We can set up the hierarchy as follows:
 
 ```ruby
 class Project < ActiveRecord::Base
@@ -23,9 +35,13 @@ class Document < ActiveRecord::Base
 end
 ```
 
+Note that, as a polymorphic association, the `:as` keyword is required.
+
+Now, `project.tags` will retrieve *all* tags attached to that project, any of its folders, and any of their documents.
+
 ### Hierarchy order
 
-You could also choose to define the resource hierarchy in the other order. In this mode, rather than `Project.tags` returning all the tags belonging to it or its sub-hierarchy, we want `Document.tags` to return the tags of itself and its hierarchy superiors.
+You could also choose to define the resource hierarchy in the other order. That is, maybe you actually want `document.tags` to return all tags associated with that document, its folder, or its project. Easy:
 
 ```ruby
 class Project < ActiveRecord::Base
@@ -45,67 +61,67 @@ class Document < ActiveRecord::Base
 end
 ```
 
-### Fetching by closest hierarchy member (shadowing)
+### Shadowing: fetching only the closest hierarchy member
 
-A common use case for this are configurations that may be applied at the `Project`, `Folder`, or `Document` level, where applying a configuration at a lower level shadows a higher-level configuration.
+A common use case for this are settings that may be applied at the `Project`, `Folder`, or `Document` level, where applying a setting at a lower level shadows / overrides a higher-level setting. E.g., a project may have setting x == ABC, but a folder within that project overrides that and uses setting x = DEF instead. Any documents in this folder will automatically inherit this new overridden setting (DEF), while documents in other folders will get the project's setting (ABC).
 
-To illustrate this, consider first a very simplified and totally-not-overkill-at-all `ShareSetting` model that `belongs_to :shareable, polymorphic: true` and has a boolean `shared` column. The idea would be to create a `ShareSetting` record for a `Project`, say we set it to `true`, and it would be inherited implicity by all of its `Folder`s and `Document`s. However, you could override this at a lower resource level by, for example, creating another `ShareSetting` record for one of this Project's folders. The desired behavior would look like this:
+To illustrate this, consider first a very simplified and totally-not-overkill-at-all `ShareSetting` model that `belongs_to :shareable, polymorphic: true` and has a boolean `shared` column. If we create a `ShareSetting` record for a project with a `true` value, this setting would be shared by all folders and doucments in this project.
 
 ```ruby
+# set up Document to inherit ShareSettings from :folder and :project
 class Document < ActiveRecord::Base
   through_hierarchy [:folder, :project] do
     has_one :share_settting, as: :resource
   end
 end
 
+## Enable sharing on the project
 project = Project.first
 ShareSetting.create(shareable: project, shared: true)
+## And the docs inherit it
 doc = project.documents.first
 doc.share_setting
 # => #<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>
-# Override the project config for a single folder:
+```
+
+But we can still disable sharing on a folder or document level within this project by creating another `ShareSetting` record on the appropriate resource:
+
+```ruby
+## Override the project config for a single folder:
 ShareSetting.create(shareable: doc.folder, shared: false)
-# Be sure to reload the asoociation by passing true!
+## Be sure to reload the asoociation by passing true!
 doc.share_setting(true)
+# => #<ShareSetting id: 2, shareable_type: "Folder", shareable_id: 1, shared: false>
+doc.folder.share_setting
 # => #<ShareSetting id: 2, shareable_type: "Folder", shareable_id: 1, shared: false>
 ```
 
-### Fetching many by closest hierarchy member
-
-In the context of a plain `has_many` association, this shadowing behavior doesn't make sense as you would expect it to return *all* `ShareSetting` belonging to the hierarchy:
+And the project, as well as other folders and document of other folders inside this project, is still shared via the project setting:
 
 ```ruby
-class Document < ActiveRecord::Base
-  through_hierarchy [:folder, :project] do
-    has_many :share_setttings, as: :resource
-  end
-end
-
-Document.first.share_settings
-# => #<ActiveRecord::Relation [#<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>, #<ShareSetting id: 2, shareable_type: "Folder", shareable_id: 1, shared: false>]>
+doc.project.share_setting(true)
+# => #<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>
+doc.project.folders.second.share_setting  ## different folder
+# => #<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>
 ```
 
-But for a more complicated `ShareSetting` model, this gets more interesting, and so we have the `uniq` feature. Let's add a `group` column to ShareSetting so we can indepednently turn on or off sharing for different groups, again at any resource level:
+### `HasMany :uniq`: Fetching many by closest hierarchy member
+
+Here's where it gets interesting. Let's make `ShareSetting` a little more complicated: let's add a `group` column to ShareSetting so we can indepednently turn on or off sharing for different groups, again at any resource level. For example, maybe we want to share a project with the "dev" group but not the "ops" group.
 
 ```ruby
 project = Project.first
 project.share_settings.destroy_all
-project.share_settings.create(group: "dev", shared: true)
-project.share_settings.create(group: "ops", shared: false)
+ShareSetting.create(shareable: project, group: "dev", shared: true)
+ShareSetting.create(shareable: project, group: "ops", shared: false)
 doc = project.documents.first
-doc.share_settings.where(group: "dev").first
+doc.share_settings.find_by(group: "dev")
 # => #<ShareSetting id: 3, shareable_type: "Project", shareable_id: 1, group: "dev", shared: true>
+doc.share_settings.find_by(group: "ops")
+# => #<ShareSetting id: 4, shareable_type: "Project", shareable_id: 1, group: "ops", shared: false>
 ```
 
-But because this is still a plain `has_many`, we lose the shadowing:
-
-```ruby
-doc.share_settings.create(group: "ops", shared: true)
-doc.share_settings.where(group: "ops")
-# => #<ActiveRecord::Relation [#<ShareSetting id: 4, shareable_type: "Project", shareable_id: 1, group: "ops", shared: false>, #<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: false>]>
-```
-
-In order to retrive only one `ShareSetting` per group, you simply need to specify it thusly:
+With `HasMany :uniq`, we can override this setting for a specific group at a specific resource. That is, we could share a specific folder or document in this project with the "ops" group by creating another ShareSetting, and the `HasMany :uniq` association will obey this shadowing in all finds and joins:
 
 ```ruby
 class Document < ActiveRecord::Base
@@ -114,15 +130,19 @@ class Document < ActiveRecord::Base
   end
 end
 
-Document.first.share_settings.where(group: "ops")
-# => #<ActiveRecord::Relation [#<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: true>]>
+## On the same doc as above, override sharing for "ops"
+ShareSetting.create(shareable: doc, group: "ops", shared: true)
+Document.first.share_settings.find_by(group: "ops")
+# => #<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: true>
+## But the folder above it still correctly inherits the project setting
+Document.first.folder.share_settings.find_by(group: "ops")
+# => #<ShareSetting id: 4, shareable_type: "Project", shareable_id: 1, group: "ops", shared: false>
 
+## The full returned list of ShareSettings can contain objects with different hierarchy levels, each being the closest for the `:group` column:
 Document.first.share_settings
 # => #<ActiveRecord::Relation [#<ShareSetting id: 3, shareable_type: "Project", shareable_id: 1, group: "dev", shared: true>, #<ShareSetting id: 5, shareable_type: "Document", shareable_id: 1, group: "ops", shared: true>]>
 
 ```
-
-Notice that we correclty select only the `ShareSetting` for each group that belongs to the lower level resource in the hierarchy: the project is not shared with "ops", but this specific document has a `ShareSetting` that overrides that.
 
 ### Joining to hierarchical Assocaitions
 Beware that this feature is still slightly experiemntal
