@@ -137,4 +137,4 @@ Query on, queryer.
 
 For `HasMany` associations, this is rather straightforward as all hierarchy levels are relevant and can be included in the resulting join. That is, a given target row can be joined to its associated model through multiple levels of the hierarchy.
 
-However, for `HasOne` and `HasMany :uniq` associations, this suddenyl becomes very complicated. The trick is to join *only* to the closest hierarchy match *for each* target row. This is not a rapid query, but I have been optimizing it to acceptable levels of performance. Suggestions and PRs welcome!
+However, for `HasOne` and `HasMany :uniq` associations, this suddenly becomes rather complicated. The trick is to join *only* to the closest hierarchy match *for each* target row. This is not a rapid query, but I have been optimizing it to acceptable levels of performance. Suggestions and PRs welcome!
