@@ -22,10 +22,7 @@ module ThroughHierarchy
       end
 
       def get_joins
-        arel = @associated.join_best_rank(group_by: @uniq)
-        result = @model.joins(arel.join_sources).order(arel.orders)
-        arel.constraints.each{|cc| result = result.where(cc)}
-        return result
+        @associated.join_best_rank(group_by: @uniq)
       end
 
     end
