@@ -93,16 +93,22 @@ module ThroughHierarchy
       # Join @model to @source only on best hierarchy matches
       ### FASTER METHOD: join source to source alias on source.rank < alias.rank where alias does not exist
       # This performs OK.
+      # TODO: return arel once we know how to use the binds properly
       def join_best_rank(group_by: nil)
         better_rank = spawn(@source.alias("better_hierarchy"))
-        @model.joins(@hierarchy).arel.
+        join_condition_array = [
+          better_rank.filters,
+          better_rank.hierarchy_rank.lt(hierarchy_rank)
+        ]
+        join_condition_array << better_rank.source[group_by].eq(@source[group_by]) if group_by.present?
+        arel = @model.arel_table.
           join(@source).on(filters).
           join(better_rank.source, Arel::Nodes::OuterJoin).
-          on(
-            better_rank.filters.
-              and(better_rank.hierarchy_rank.lt(hierarchy_rank))
-          ).
+          on(and_conditions(join_condition_array)).
           where(better_rank.source[:id].eq(nil))
+        result = @model.joins(@hierarchy).joins(arel.join_sources).order(arel.orders)
+          arel.constraints.each{|cc| result = result.where(cc)}
+          return result
       end
 
       # # TODO: generate this dynamically based on existing columns and selects
