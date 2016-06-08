@@ -33,9 +33,15 @@ module ThroughHierarchy
         [@model] + @hierarchy.map{|m| @model.reflect_on_association(m).klass}
       end
 
+      def hierarchy_association(model)
+        return nil if model == @model
+        label = @hierarchy.find{|a| @model.reflect_on_association(a).klass.base_class == model}
+        @model.reflect_on_association(label)
+      end
+
       # TODO: some of these may be :through others, so this may generate redundant joins
       def hierarchy_joins
-        @hierarchy
+        @hierarchy.reject{|a| belongs_to?(a)}
       end
 
       def and_conditions(conditions)
@@ -52,7 +58,23 @@ module ThroughHierarchy
 
       def filter(model)
         foreign_type_column.eq(model_type(model)).
-          and(foreign_key_column.eq(model_key(model)))
+          and(foreign_key_column.eq(efficient_key(model)))
+      end
+
+      def efficient_key(model)
+        if model <= @model
+          model_key(model)
+        elsif belongs_to?(model)
+          @model.arel_table[hierarchy_association(model).foreign_key]
+        else
+          model_key(model)
+        end
+      end
+
+      def belongs_to?(member)
+        return false if member == @model
+        assoc = member.is_a?(Class) ? hierarchy_association(member) : @model.reflect_on_association(member)
+        assoc.is_a?(ActiveRecord::Reflection::BelongsToReflection)
       end
 
       # Sort order for hierarchy shadowing queries
@@ -106,7 +128,7 @@ module ThroughHierarchy
           join(better_rank.source, Arel::Nodes::OuterJoin).
           on(and_conditions(join_condition_array)).
           where(better_rank.source[:id].eq(nil))
-        result = @model.joins(@hierarchy).joins(arel.join_sources).order(arel.orders)
+        result = @model.joins(hierarchy_joins).joins(arel.join_sources).order(arel.orders)
           arel.constraints.each{|cc| result = result.where(cc)}
           return result
       end
