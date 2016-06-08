@@ -14,6 +14,12 @@ module ThroughHierarchy
     end
 
     module ClassMethods
+      # deep_dup these class attributes on inheritance so we can safely use in-place modifiers
+      def inherited(child)
+        child.hierarchical_associations = self.hierarchical_associations.deep_dup
+        super
+      end
+
       def through_hierarchy(members, &blk)
         Hierarchy.new(self, members).instance_eval(&blk)
       end
