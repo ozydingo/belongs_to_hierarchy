@@ -14,6 +14,7 @@ module ThroughHierarchy
 
       def find(instance)
         results = get_matches(instance)
+        results = results.create_with(associated_instance(instance).create_with)
         results = results.instance_exec(&@scope) if @scope.present?
         return results
       end

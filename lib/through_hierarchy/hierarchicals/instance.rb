@@ -20,6 +20,13 @@ module ThroughHierarchy
           and(foreign_key_column.eq(instance_key(instance)))
       end
 
+      def create_with
+        {
+          foreign_type_name => instance_type(@instance),
+          foreign_key_name => instance_key(@instance)
+        }
+      end
+
       def instance_type(instance)
         instance.class.base_class.to_s
       end
