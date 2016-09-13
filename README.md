@@ -1,13 +1,13 @@
 # Has Many Through Hierarchy
-## Define hierarchically polymorphic has_one and has_many assocaitions between ActiveRecord models
+## Define an association between an ActiveRecord model and a hierachy of various other models
 
-Through Hierarchy allows you to construct associations that span across associaiton hierarchies. These fall into three type: `HasMany`, `HasOne`, and `HasMany :uniq`.
+Through Hierarchy allows you to construct associations that span across different models via a defined hierarchy. Supported associations include `has_one`, `has_many`, and `has)many :uniq` associations.
 
-* A `HasMany` assocaition fetches any objects associated to a target through any of its hierarchy members.
+* A `has_many` assocaition fetches any objects associated to a target through any of its hierarchy members.
 
-* A `HasOne` will always fetch the association belonging to the closest hierarchy member (e.g. Document < Folder < Project).
+* A `has_one` will always fetch the association belonging to the closest hierarchy member (e.g. Document < Folder < Project).
 
-* A `HasMany :uniq` assocaition retrieves multiple assocaited objects, but groups them by a specified field (e.g. a type or type_id column), and fetches only the object belonging to the closest hierarchy member *within* each group. In essense, a `HasMany :uniq` association can be described as a `HasMany HasOnes` of the same model.
+* A `has_many :uniq` assocaition retrieves multiple assocaited objects, but groups them by a specified field (e.g. a type or type_id column), and fetches only the object belonging to the closest hierarchy member *within* each group. In essense, a `has_many :uniq` association can be described as a `has_many has_one`s of the same model.
 
 ### Example
 
@@ -105,7 +105,7 @@ doc.project.folders.second.share_setting  ## different folder
 # => #<ShareSetting id: 1, shareable_type: "Project", shareable_id: 1, shared: true>
 ```
 
-### `HasMany :uniq`: Fetching many by closest hierarchy member
+### `has_many :uniq`: Fetching many by closest hierarchy member
 
 Here's where it gets interesting. Let's make `ShareSetting` a little more complicated: let's add a `group` column to ShareSetting so we can indepednently turn on or off sharing for different groups, again at any resource level. For example, maybe we want to share a project with the "dev" group but not the "ops" group.
 
@@ -121,7 +121,7 @@ doc.share_settings.find_by(group: "ops")
 # => #<ShareSetting id: 4, shareable_type: "Project", shareable_id: 1, group: "ops", shared: false>
 ```
 
-With `HasMany :uniq`, we can override this setting for a specific group at a specific resource. That is, we could share a specific folder or document in this project with the "ops" group by creating another ShareSetting, and the `HasMany :uniq` association will obey this shadowing in all finds and joins:
+With `has_many :uniq`, we can override this setting for a specific group at a specific resource. That is, we could share a specific folder or document in this project with the "ops" group by creating another ShareSetting, and the `has_many :uniq` association will obey this shadowing in all finds and joins:
 
 ```ruby
 class Document < ActiveRecord::Base
@@ -155,6 +155,6 @@ Document.joins_through_hierarchy(:share_settings)
 
 Query on, queryer.
 
-For `HasMany` associations, this is rather straightforward as all hierarchy levels are relevant and can be included in the resulting join. That is, a given target row can be joined to its associated model through multiple levels of the hierarchy.
+For `has_many` associations, this is rather straightforward as all hierarchy levels are relevant and can be included in the resulting join. That is, a given target row can be joined to its associated model through multiple levels of the hierarchy.
 
-However, for `HasOne` and `HasMany :uniq` associations, this suddenly becomes rather complicated. The trick is to join *only* to the closest hierarchy match *for each* target row. This is not a rapid query, but I have been optimizing it to acceptable levels of performance. Suggestions and PRs welcome!
+However, for `has_one` and `has_many :uniq` associations, this suddenly becomes rather complicated. The trick is to join *only* to the closest hierarchy match *for each* target row. This is not a rapid query, but I have been optimizing it to acceptable levels of performance. Suggestions and PRs welcome!
