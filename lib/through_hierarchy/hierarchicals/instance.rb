@@ -12,7 +12,7 @@ module ThroughHierarchy
       end
 
       def filters
-        or_conditions(hierarchy_instances.map{|instance| filter(instance)})
+        or_conditions(hierarchy_instances.compact.map{|instance| filter(instance)})
       end
 
       def filter(instance)
