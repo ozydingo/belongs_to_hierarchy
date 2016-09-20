@@ -6,11 +6,15 @@ module ThroughHierarchy
       class_attribute :hierarchical_associations
       self.hierarchical_associations = {}
       attr_reader :hierarchical_association_cache
-      after_initialize :reset_hierarchical_association_cache
+      after_initialize :clear_hierarchical_association_cache
     end
 
-    def reset_hierarchical_association_cache
-      @hierarchical_association_cache = {}
+    def clear_hierarchical_association_cache(name = nil)
+      if name.nil?
+        @hierarchical_association_cache = {}
+      else
+        @hierarchical_association_cache.delete(name)
+      end
     end
 
     module ClassMethods
