@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'through_hierarchy'
-  s.version     = '0.1.5'
+  s.version     = '0.2.0'
   s.date        = '2016-05-04'
   s.summary     = "Has Many Through Hierarchy"
   s.description = "Create hierarchical polymorphic associations"

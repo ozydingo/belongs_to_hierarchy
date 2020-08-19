@@ -60,7 +60,7 @@ module ThroughHierarchy
         Arel.sql(
           "CASE `#{@source.name}`.`#{foreign_type_name}` " +
           hierarchy_models.map.with_index do |model, ii|
-            "WHEN #{model.sanitize(model.base_class.to_s)} THEN #{ii} "
+            "WHEN #{ThroughHierarchy::RailsUtils.sanitize_sql(model.base_class.to_s)} THEN #{ii} "
           end.join +
           "END"
         )
